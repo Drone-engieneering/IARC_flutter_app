@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/usb_service.dart';
-import '../services/voice_command_service.dart';
 import 'usb_tab.dart';
+import '../services/voice_command_service.dart';
 import 'voice_command_tab.dart';
 
 class UsbDeviceScreen extends StatefulWidget {
@@ -12,7 +12,6 @@ class UsbDeviceScreen extends StatefulWidget {
 class _UsbDeviceScreenState extends State<UsbDeviceScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
   final UsbService _usbService = UsbService();
   late VoiceCommandService _voiceService;
 
@@ -20,16 +19,16 @@ class _UsbDeviceScreenState extends State<UsbDeviceScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _usbService.getDevices(setState);
+
+    // Safe call to setState after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _usbService.getDevices(() => setState(() {}));
+    });
 
     _voiceService = VoiceCommandService(
       onCommandRecognized: (command) async {
-        // Voice command handling stays here
-        if (command == null) {
-          return; // Could show error in VoiceCommandTab itself
-        }
+        if (command == null) return;
 
-        // Ask user to confirm command
         bool confirmed = await VoiceCommandTab.showConfirmDialog(
           context,
           command.baseCommand,
@@ -46,7 +45,6 @@ class _UsbDeviceScreenState extends State<UsbDeviceScreen>
           if (finalValue == null) return;
         }
 
-        // Send final command via USB
         _usbService.sendData('${command.baseCommand} ${finalValue ?? ''}');
       },
     );

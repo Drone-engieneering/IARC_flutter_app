@@ -10,55 +10,82 @@ class UsbService {
   String connectionStatus = 'No device connected';
   StreamSubscription<Uint8List>? _inputStreamSubscription;
 
-  void getDevices(void Function(void Function()) setState) async {
+  /// Get list of USB devices
+  Future<void> getDevices(void Function() updateUI) async {
     devices = await UsbSerial.listDevices();
-    setState(() {});
+    updateUI();
   }
 
-  void connectUsbDevice(
+  /// Connect to a USB device
+  Future<void> connectUsbDevice(
     UsbDevice device,
-    void Function(void Function()) setState,
+    void Function() updateUI,
   ) async {
     _device = device;
+
     try {
       _port = await device.create();
-      await _port?.open();
-      await _port?.setDTR(true);
-      await _port?.setRTS(true);
-      connectionStatus = 'Device connected: ${_device?.deviceName}';
-      setState(() {});
+      if (_port == null) {
+        connectionStatus = 'Failed to open port';
+        updateUI();
+        return;
+      }
+
+      await _port!.open();
+      await _port!.setDTR(true);
+      await _port!.setRTS(true);
+
+      connectionStatus =
+          'Device connected: ${_device?.productName ?? "Unknown"}';
+      updateUI();
+
+      // Start listening automatically
+      _startListening(updateUI);
     } catch (e) {
       connectionStatus = 'Failed to connect: $e';
-      setState(() {});
+      updateUI();
     }
   }
 
-  void sendData(String data) async {
+  /// Send data to the connected device
+  Future<void> sendData(String data) async {
     if (_port != null) {
-      await _port?.write(Uint8List.fromList(data.codeUnits));
+      await _port!.write(Uint8List.fromList(data.codeUnits));
     }
   }
 
-  void receiveData() async {
-    if (_port != null && _port!.inputStream != null) {
-      await _inputStreamSubscription?.cancel();
-      _inputStreamSubscription = _port!.inputStream!.listen((Uint8List data) {
-        receivedData = String.fromCharCodes(data);
-      });
-    }
-  }
-
-  void disconnectUsbDevice() {
+  /// Internal: start listening to incoming data
+  void _startListening(void Function() updateUI) {
     _inputStreamSubscription?.cancel();
-    _port?.close();
+    if (_port?.inputStream != null) {
+      _inputStreamSubscription = _port!.inputStream!.listen(
+        (Uint8List data) {
+          String newData = String.fromCharCodes(data);
+          receivedData += newData;
+          updateUI();
+        },
+        onError: (error) {
+          connectionStatus = 'Error reading data: $error';
+          updateUI();
+        },
+        cancelOnError: true,
+      );
+    }
+  }
+
+  /// Disconnect USB device
+  Future<void> disconnectUsbDevice(void Function() updateUI) async {
+    await _inputStreamSubscription?.cancel();
+    await _port?.close();
     _device = null;
     _port = null;
     receivedData = '';
     connectionStatus = 'No device connected';
+    updateUI();
   }
 
-  void dispose() {
-    _inputStreamSubscription?.cancel();
-    _port?.close();
+  void dispose() async {
+    await _inputStreamSubscription?.cancel();
+    await _port?.close();
   }
 }
