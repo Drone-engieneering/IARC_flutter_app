@@ -3,7 +3,7 @@
 
     <!-- USB Host Permission -->
     <uses-feature android:name="android.hardware.usb.host" android:required="true"/>
-    <uses-permission android:name="android.permission.USB_PERMISSION"/>
+    <uses-permission android:name="android.permission.USB._PERMISSION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

@@ -1,10 +1,9 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart' as fmtc;
 
-import 'services/global_log.dart';   // <-- global logger (ChangeNotifier singleton)
+import 'services/global_log.dart';
 import 'state/app_state.dart';
 import 'screens/map_tab.dart';
 import 'screens/logs_tab.dart';
