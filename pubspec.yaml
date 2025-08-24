@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  speech_to_text: ^7.3.0
+  string_similarity: ^2.1.1
   usb_serial: ^0.5.2
 
 dev_dependencies:
