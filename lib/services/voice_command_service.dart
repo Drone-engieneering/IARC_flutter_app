@@ -1,17 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:string_similarity/string_similarity.dart';
+import '../models/drone_command.dart';
 
-typedef CommandCallback = void Function(String recognizedCommand);
+typedef DroneCommandCallback = void Function(DroneCommand? command);
 
 class VoiceCommandService {
-  stt.SpeechToText _speech = stt.SpeechToText();
+  final stt.SpeechToText _speech = stt.SpeechToText();
   bool isListening = false;
   bool isAvailable = false;
   String lastCommand = '';
-  List<String> commands = ['TAKE OFF', 'LAND'];
 
-  CommandCallback? onCommandRecognized;
+  /// Base commands (numeric values can be added later)
+  final List<String> baseCommands = [
+    'TAKE OFF',
+    'LAND',
+    'FLY FORWARD',
+    'FLY UP',
+  ];
+
+  DroneCommandCallback? onCommandRecognized;
 
   VoiceCommandService({this.onCommandRecognized});
 
@@ -20,15 +28,10 @@ class VoiceCommandService {
     VoidCallback? onListeningStarted,
     ValueChanged<String>? onError,
   }) async {
-    if (isListening) {
-      debugPrint('startListening called, but already listening');
-      return false;
-    }
+    if (isListening) return false;
 
-    debugPrint('Initializing speech recognizer...');
     try {
       isAvailable = await _speech.initialize();
-      debugPrint('Speech recognizer initialized: $isAvailable');
     } catch (e, stack) {
       isAvailable = false;
       debugPrint('Speech recognizer initialization failed: $e');
@@ -38,23 +41,36 @@ class VoiceCommandService {
     }
 
     if (!isAvailable) {
-      debugPrint('Speech recognition not available on this device');
       onError?.call('Speech recognition not available');
       return false;
     }
 
-    debugPrint('Starting to listen...');
     isListening = true;
     onListeningStarted?.call();
 
     _speech.listen(
       onResult: (result) {
-        lastCommand = result.recognizedWords;
+        lastCommand = result.recognizedWords.toUpperCase();
         debugPrint('Recognized words: $lastCommand');
-        String bestMatch = _findBestMatch(lastCommand);
-        if (bestMatch.isNotEmpty && onCommandRecognized != null) {
-          debugPrint('Best matched command: $bestMatch');
-          onCommandRecognized!(bestMatch);
+
+        String? baseCommand = _findBestBaseCommand(lastCommand);
+        if (baseCommand != null) {
+          debugPrint('Best matched base command: $baseCommand');
+
+          // Value left null here; screen will request numeric input if required
+          double? value;
+          if (requiresValue(baseCommand)) {
+            debugPrint(
+              'Command $baseCommand requires numeric value. Await user input.',
+            );
+          }
+
+          onCommandRecognized?.call(
+            DroneCommand(baseCommand: baseCommand, value: value),
+          );
+        } else {
+          debugPrint('No matching command found');
+          onCommandRecognized?.call(null);
         }
       },
       listenMode: stt.ListenMode.confirmation,
@@ -63,24 +79,29 @@ class VoiceCommandService {
     return true;
   }
 
+  /// Stop listening
   void stopListening({VoidCallback? onListeningStopped}) {
-    if (!isListening) {
-      debugPrint('stopListening called, but not currently listening');
-      return;
-    }
-    debugPrint('Stopping listening...');
+    if (!isListening) return;
+
     _speech.stop();
     isListening = false;
     onListeningStopped?.call();
   }
 
-  String _findBestMatch(String command) {
-    String bestMatch = '';
+  /// Public method: check if a command requires numeric input
+  bool requiresValue(String baseCommand) {
+    return baseCommand.startsWith('FLY FORWARD') ||
+        baseCommand.startsWith('FLY UP');
+  }
+
+  /// Private method: find best matching base command
+  String? _findBestBaseCommand(String command) {
+    String? bestMatch;
     double bestSimilarity = 0.0;
 
-    for (String predefinedCommand in commands) {
+    for (String predefinedCommand in baseCommands) {
       double similarity = command.similarityTo(predefinedCommand);
-      if (similarity > bestSimilarity) {
+      if (similarity > bestSimilarity && similarity > 0.5) {
         bestSimilarity = similarity;
         bestMatch = predefinedCommand;
       }
